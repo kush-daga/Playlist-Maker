@@ -15,19 +15,33 @@ const Home: NextPage = () => {
   const [songList, setSongList] = useState<string[]>([]);
   const [allVibes, setAllVibes] = useState<string[]>([]);
 
+  const [playlistData, setPlaylistData] = useState<{
+    id: string;
+    url: string;
+  } | null>(null);
+
   const { mutateAsync: imagineSongs, isLoading } =
-    api.gpt.sampleImagineSongsList.useMutation();
+    api.gpt.imagineSongsList.useMutation();
+
+  const { mutateAsync: createPlaylist, isLoading: creatingPlaylist } =
+    api.spotify.createPlaylist.useMutation();
 
   const handleClick = async (e: any) => {
-    console.log("TRYING HERE");
+    console.log("TRYING HERE", prompt, allVibes);
     try {
       const data = await imagineSongs({
         prompt,
-        vibes: ["happy", "anime", "fun", "fast"],
+        vibes: allVibes,
       });
 
       if (data) {
         console.log("GOT BACK THIS", data);
+        const playlistRes = await createPlaylist({ songList: data });
+        if (playlistRes)
+          setPlaylistData({
+            id: playlistRes.id,
+            url: playlistRes.url,
+          });
         setSongList(data);
       }
     } catch (e) {
@@ -36,6 +50,7 @@ const Home: NextPage = () => {
     }
   };
 
+  const loadingState = isLoading && creatingPlaylist;
   return (
     <>
       <Head>
@@ -96,16 +111,22 @@ const Home: NextPage = () => {
             </form>
           </div>
           <button
-            disabled={isLoading}
+            disabled={loadingState}
             onClick={(e) => {
               void handleClick(e);
             }}
             className="w-full rounded-md bg-purple-100 p-4"
           >
-            {isLoading ? "Please Wait!" : "Get Songs!"}
+            {loadingState ? "Please Wait!" : "Get Songs!"}
           </button>
         </main>
-        <SongList songsList={songList} />
+        {!loadingState && (
+          <SongList
+            songsList={songList}
+            playlistUrl={playlistData?.url}
+            playlistId={playlistData?.id}
+          />
+        )}
       </div>
     </>
   );
@@ -115,6 +136,8 @@ export default Home;
 
 const AuthShowcase: React.FC = () => {
   const { data: sessionData } = useSession();
+
+  console.log(sessionData);
 
   return (
     <div className="flex flex-col items-center justify-center gap-4">
